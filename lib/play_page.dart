@@ -28,29 +28,27 @@ class Clip {
 
 class _PlayPageState extends State<PlayPage> {
   // VideoPlayerController _controller;
-  ChewieController _oldController;
+  // ChewieController _oldController;
   ChewieController _chewieController;
-  Future<void> _initializeVideoPlayerFuture;
+  // Future<void> _initializeVideoPlayerFuture;
 
   List<Clip> _clips = [
+    new Clip("small", "small", 6),
     new Clip("earth", "earth", 13),
     new Clip("giraffe", "giraffe", 18),
     new Clip("particle", "particle", 11),
-    new Clip("small", "small", 6),
     new Clip("summer", "summer", 8)
   ];
 
   var _playingIndex = -1;
   var _disposed = false;
-  var _isPlaying = false;
-  var _isEndPlaying = false;
   var _isFullScreen = false;
 
   @override
   void initState() {
     Screen.keepOn(true);
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
-    _preparePlay(0);
+    _initializeAndPlay(0);
     super.initState();
   }
 
@@ -59,48 +57,76 @@ class _PlayPageState extends State<PlayPage> {
     _disposed = true;
     Screen.keepOn(false);
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
-    _initializeVideoPlayerFuture = null;
-    // _controller?.dispose();
-    // _controller = null;
-    _oldController?.dispose();
-    _oldController = null;
     _chewieController?.dispose();
     _chewieController = null;
     super.dispose();
   }
 
-  void _preparePlay(int index) {
-    print("play ---------> $index");
-    _initializeVideoPlayerFuture = null;
-    _initializeAndPlay(index).then((_){
-      _clearPrevious();
-    });
-    setState(() {
-    });
-  }
-
-  Future<void> _clearPrevious() async {
-    _oldController?.videoPlayerController?.removeListener(_onControllerUpdated);
+  void _clearPrevious() {
+    _chewieController?.exitFullScreen();
+    _chewieController?.videoPlayerController?.removeListener(_onControllerUpdated);
+    _chewieController?.removeListener(_onChewieUpdated);
     //_oldController?.dispose();
-    _oldController = null;
+    _chewieController = null;
   }
 
-  Future<void> _initializeAndPlay(int index) async {
+  void _initializeAndPlay(int index) async {
+    print("_initializeAndPlay ---------> $index / _isFullScreen=$_isFullScreen");
     final clip = _clips[index];
     final controller = ChewieController(
       videoPlayerController: VideoPlayerController.asset(clip.videoPath()),
       fullScreenByDefault: _isFullScreen,
+      autoPlay: false,
+      allowFullScreen: true,
+      aspectRatio: 16 /9
     );
-    controller.videoPlayerController.addListener(_onControllerUpdated);
-    
-    _oldController = _chewieController;
+
+    //_oldController = _chewieController;
+    _clearPrevious();
     _chewieController = controller;
 
     setState(() {
-      _initializeVideoPlayerFuture = controller.videoPlayerController.initialize();
-      _playingIndex = index;
+      debugPrint("----1");
+    });
+
+    Future.delayed(Duration(milliseconds: 100), () {
+      controller.videoPlayerController
+        ..initialize().then((_) {
+          debugPrint("----------2");
+          _playingIndex = index;
+
+          controller.videoPlayerController.addListener(_onControllerUpdated);
+          controller.addListener(_onChewieUpdated);
+          controller.play();
+          setState(() {});
+        });
     });
   }
+
+  void _onChewieUpdated() {
+    final chewie = _chewieController;
+    if (chewie == null || _disposed) return;
+    debugPrint("+++++++++++ _onChewieUpdated ${chewie.isFullScreen}");
+    // fullscreen
+    // if (chewie.isFullScreen) {
+    //   this._isFullScreen = true;
+    //   debugPrint("+++++++++++ _isFullScreen $_isFullScreen");
+    //   SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight])
+    //       .then((_) {
+    //     setState(() {});
+    //   });
+    // } else if (!chewie.isFullScreen) {
+    //   this._isFullScreen = false;
+    //   debugPrint("+++++++++++ _isFullScreen $_isFullScreen");
+    //   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((_) {
+    //     setState(() {});
+    //   });
+    // }
+    // setState(() {});
+  }
+
+  var _isPlaying = false;
+  var _isEndOfClip = false;
 
   Future<void> _onControllerUpdated() async {
     final chewie = _chewieController;
@@ -112,14 +138,18 @@ class _PlayPageState extends State<PlayPage> {
     final duration = controller.value.duration;
     if (position == null || duration == null) return;
 
-    final isPlaying = position.inMilliseconds < duration.inMilliseconds;
-    final isEndPlaying = position.inMilliseconds > 0 && position.inSeconds == duration.inSeconds;
+    final isPlaying = controller.value.isPlaying;
+    final isEndOfClip = position.inMilliseconds > 0 && position.inSeconds == duration.inSeconds;
+    
+    if (position.inSeconds % 3 == 0)
+      debugPrint(".");
 
-    if (_isPlaying != isPlaying || _isEndPlaying != isEndPlaying) {
+    if (_isPlaying != isPlaying || _isEndOfClip != isEndOfClip) {
       _isPlaying = isPlaying;
-      _isEndPlaying = isEndPlaying;
-      print("$_playingIndex -----> isPlaying=$isPlaying / isCompletePlaying=$isEndPlaying");
-      if (isEndPlaying) {
+      _isEndOfClip = isEndOfClip;
+      debugPrint("$_playingIndex -----> isPlaying=$isPlaying / isEndPlaying=$isEndOfClip");
+      if (isEndOfClip && !isPlaying) {
+        debugPrint("handle NEXT ========================== ");
         final isComplete = _playingIndex == _clips.length - 1;
         if (isComplete) {
           print("played all!!");
@@ -130,25 +160,9 @@ class _PlayPageState extends State<PlayPage> {
             });
           }
         } else {
-          _preparePlay(_playingIndex + 1);
+          _initializeAndPlay(_playingIndex + 1);
         }
       }
-    }
-
-    // fullscreen
-    if (chewie.isFullScreen && !this._isFullScreen) {
-      this._isFullScreen = true;
-      debugPrint("_isFullScreen $_isFullScreen");
-      SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight])
-          .then((_) {
-        setState(() {});
-      });
-    } else if (!chewie.isFullScreen && this._isFullScreen) {
-      this._isFullScreen = false;
-      debugPrint("_isFullScreen $_isFullScreen");
-      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((_) {
-        setState(() {});
-      });
     }
   }
 
@@ -163,7 +177,7 @@ class _PlayPageState extends State<PlayPage> {
             content: SingleChildScrollView(child: Text("끝까지 재생되었습니다.")),
             actions: <Widget>[
               FlatButton(
-                child: Text("종료"),
+                child: Text("닫기"),
                 onPressed: () => Navigator.pop(context, true),
               )
             ],
@@ -177,49 +191,46 @@ class _PlayPageState extends State<PlayPage> {
       appBar: AppBar(
         title: Text("Play View"),
       ),
-      body: Column(children: <Widget>[
-        Container(
-          child: _playView(),
-          decoration: BoxDecoration(color: Colors.black),
-        ),
-        Expanded(
-          child: _listView(),
-        ),
-      ]),
+      body: !_isFullScreen
+          ? Column(children: <Widget>[
+              Container(
+                child: _playView(),
+                decoration: BoxDecoration(color: Colors.black),
+              ),
+              Expanded(
+                child: _listView(),
+              ),
+            ])
+          : Container(
+              child: _playView(),
+              decoration: BoxDecoration(color: Colors.black),
+            ),
     );
   }
 
   void _onTapCard(int index) {
-    _preparePlay(index);
+    _initializeAndPlay(index);
   }
 
   Widget _playView() {
     // FutureBuilder to display a loading spinner until finishes initializing
     final controller = _chewieController?.videoPlayerController;
-    return FutureBuilder(
-      future: _initializeVideoPlayerFuture,
-      builder: (BuildContext context, AsyncSnapshot snapshot) {
-        if (snapshot.connectionState == ConnectionState.done && controller != null) {
-          if (!controller.value.isPlaying) {
-            _chewieController.play();
-          }
-          return AspectRatio(
-            //aspectRatio: controller.value.aspectRatio,
-            aspectRatio: 16.0 / 9.0,
-            child: Chewie(controller: _chewieController),
-          );
-        } else {
-          return AspectRatio(
-            aspectRatio: 16.0 / 9.0,
-            child: Center(
-                child: Text(
-              "준비중 ...",
-              style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 18.0),
-            )),
-          );
-        }
-      },
-    );
+    if (controller != null && controller.value.initialized) {
+      return AspectRatio(
+        //aspectRatio: controller.value.aspectRatio,
+        aspectRatio: 16.0 / 9.0,
+        child: Chewie(controller: _chewieController),
+      );
+    } else {
+      return AspectRatio(
+        aspectRatio: 16.0 / 9.0,
+        child: Center(
+            child: Text(
+          "준비중 ...",
+          style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 18.0),
+        )),
+      );
+    }
   }
 
   Widget _listView() {
