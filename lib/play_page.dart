@@ -98,6 +98,9 @@ class _PlayPageState extends State<PlayPage> {
           controller.videoPlayerController.addListener(_onControllerUpdated);
           controller.addListener(_onChewieUpdated);
           controller.play();
+          if(_isFullScreen) {
+            _chewieController?.enterFullScreen();
+          }
           setState(() {});
         });
     });
@@ -108,20 +111,20 @@ class _PlayPageState extends State<PlayPage> {
     if (chewie == null || _disposed) return;
     debugPrint("+++++++++++ _onChewieUpdated ${chewie.isFullScreen}");
     // fullscreen
-    // if (chewie.isFullScreen) {
-    //   this._isFullScreen = true;
+    if (chewie.isFullScreen) {
+      this._isFullScreen = true;
     //   debugPrint("+++++++++++ _isFullScreen $_isFullScreen");
     //   SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight])
     //       .then((_) {
     //     setState(() {});
     //   });
-    // } else if (!chewie.isFullScreen) {
-    //   this._isFullScreen = false;
+    } else if (!chewie.isFullScreen) {
+      this._isFullScreen = false;
     //   debugPrint("+++++++++++ _isFullScreen $_isFullScreen");
     //   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((_) {
     //     setState(() {});
     //   });
-    // }
+    }
     // setState(() {});
   }
 
