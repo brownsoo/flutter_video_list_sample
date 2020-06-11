@@ -1,4 +1,3 @@
-import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:screen/screen.dart';
@@ -27,10 +26,7 @@ class Clip {
 }
 
 class _PlayPageState extends State<PlayPage> {
-  // VideoPlayerController _controller;
-  // ChewieController _oldController;
-  ChewieController _chewieController;
-  // Future<void> _initializeVideoPlayerFuture;
+  VideoPlayerController _controller;
 
   List<Clip> _clips = [
     new Clip("small", "small", 6),
@@ -43,6 +39,10 @@ class _PlayPageState extends State<PlayPage> {
   var _playingIndex = -1;
   var _disposed = false;
   var _isFullScreen = false;
+  var _isPlaying = false;
+  var _isEndOfClip = false;
+  var _progress = 0.0;
+  var _showingDialog = false;
 
   @override
   void initState() {
@@ -57,84 +57,67 @@ class _PlayPageState extends State<PlayPage> {
     _disposed = true;
     Screen.keepOn(false);
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
-    _chewieController?.dispose();
-    _chewieController = null;
+    exitFullScreen();
+    _controller?.dispose();
+    _controller = null;
     super.dispose();
   }
 
   void _clearPrevious() {
-    _chewieController?.exitFullScreen();
-    _chewieController?.videoPlayerController?.removeListener(_onControllerUpdated);
-    _chewieController?.removeListener(_onChewieUpdated);
-    //_oldController?.dispose();
-    _chewieController = null;
+    _controller?.removeListener(_onControllerUpdated);
+    _controller = null;
+  }
+
+  void _toggleFullscreen() async {
+    if (_isFullScreen) {
+      exitFullScreen();
+    } else {
+      enterFullScreen();
+    }
+  }
+
+  void enterFullScreen() async {
+    debugPrint("enterFullScreen");
+    _isFullScreen = true;
+    await SystemChrome.setEnabledSystemUIOverlays([]);
+    await SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+  }
+
+  void exitFullScreen() async {
+    debugPrint("exitFullScreen");
+    _isFullScreen = false;
+    await SystemChrome.setEnabledSystemUIOverlays(SystemUiOverlay.values);
+    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   }
 
   void _initializeAndPlay(int index) async {
     print("_initializeAndPlay ---------> $index / _isFullScreen=$_isFullScreen");
     final clip = _clips[index];
-    final controller = ChewieController(
-      videoPlayerController: VideoPlayerController.asset(clip.videoPath()),
-      fullScreenByDefault: _isFullScreen,
-      autoPlay: false,
-      allowFullScreen: true,
-      aspectRatio: 16 /9
-    );
+    final controller = VideoPlayerController.asset(clip.videoPath());
 
-    //_oldController = _chewieController;
     _clearPrevious();
-    _chewieController = controller;
+    _controller = controller;
 
     setState(() {
       debugPrint("----1");
     });
 
     Future.delayed(Duration(milliseconds: 100), () {
-      controller.videoPlayerController
+      controller
         ..initialize().then((_) {
           debugPrint("----------2");
           _playingIndex = index;
-
-          controller.videoPlayerController.addListener(_onControllerUpdated);
-          controller.addListener(_onChewieUpdated);
+          controller.addListener(_onControllerUpdated);
           controller.play();
-          if(_isFullScreen) {
-            _chewieController?.enterFullScreen();
-          }
           setState(() {});
         });
     });
   }
 
-  void _onChewieUpdated() {
-    final chewie = _chewieController;
-    if (chewie == null || _disposed) return;
-    debugPrint("+++++++++++ _onChewieUpdated ${chewie.isFullScreen}");
-    // fullscreen
-    if (chewie.isFullScreen) {
-      this._isFullScreen = true;
-    //   debugPrint("+++++++++++ _isFullScreen $_isFullScreen");
-    //   SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight])
-    //       .then((_) {
-    //     setState(() {});
-    //   });
-    } else if (!chewie.isFullScreen) {
-      this._isFullScreen = false;
-    //   debugPrint("+++++++++++ _isFullScreen $_isFullScreen");
-    //   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((_) {
-    //     setState(() {});
-    //   });
-    }
-    // setState(() {});
-  }
-
-  var _isPlaying = false;
-  var _isEndOfClip = false;
-
+  var _playSeconds = 0.0;
   Future<void> _onControllerUpdated() async {
-    final chewie = _chewieController;
-    if (chewie == null || _disposed) return;
-    final controller = chewie.videoPlayerController;
+    if (_disposed) return;
+    final controller = _controller;
     if (controller == null) return;
     if (!controller.value.initialized) return;
     final position = await controller.position;
@@ -143,33 +126,40 @@ class _PlayPageState extends State<PlayPage> {
 
     final isPlaying = controller.value.isPlaying;
     final isEndOfClip = position.inMilliseconds > 0 && position.inSeconds == duration.inSeconds;
-    
-    if (position.inSeconds % 3 == 0)
-      debugPrint(".");
+
+    // handle progress
+    final seconds = position.inMilliseconds / 200.0;
+    if (isPlaying && _playSeconds != seconds) {
+      _playSeconds = seconds;
+      if (_disposed) return;
+      setState(() {
+        _progress = position.inMilliseconds.ceilToDouble() / duration.inMilliseconds.ceilToDouble();
+      });
+    }
 
     if (_isPlaying != isPlaying || _isEndOfClip != isEndOfClip) {
       _isPlaying = isPlaying;
-      _isEndOfClip = isEndOfClip;
-      debugPrint("$_playingIndex -----> isPlaying=$isPlaying / isEndPlaying=$isEndOfClip");
-      if (isEndOfClip && !isPlaying) {
-        debugPrint("handle NEXT ========================== ");
-        final isComplete = _playingIndex == _clips.length - 1;
-        if (isComplete) {
-          print("played all!!");
-          if (!_showingDialog) {
-            _showingDialog = true;
-            _showPlayedAllDialog().then((value) {
-              _showingDialog = false;
-            });
+      if (_isEndOfClip != isEndOfClip) {
+        _isEndOfClip = isEndOfClip;
+        debugPrint("updated -----> isPlaying=$isPlaying / isEndPlaying=$isEndOfClip");
+        if (isEndOfClip && isPlaying) {
+          debugPrint("========================== End of Clip / Handle NEXT ========================== ");
+          final isComplete = _playingIndex == _clips.length - 1;
+          if (isComplete) {
+            print("played all!!");
+            if (!_showingDialog) {
+              _showingDialog = true;
+              _showPlayedAllDialog().then((value) {
+                _showingDialog = false;
+              });
+            }
+          } else {
+            _initializeAndPlay(_playingIndex + 1);
           }
-        } else {
-          _initializeAndPlay(_playingIndex + 1);
         }
       }
     }
   }
-
-  bool _showingDialog = false;
 
   Future<bool> _showPlayedAllDialog() async {
     return showDialog<bool>(
@@ -194,20 +184,20 @@ class _PlayPageState extends State<PlayPage> {
       appBar: AppBar(
         title: Text("Play View"),
       ),
-      body: !_isFullScreen
-          ? Column(children: <Widget>[
+      body: _isFullScreen
+          ? Container(
+              child: _playView(context),
+              decoration: BoxDecoration(color: Colors.black),
+            )
+          : Column(children: <Widget>[
               Container(
-                child: _playView(),
+                child: _playView(context),
                 decoration: BoxDecoration(color: Colors.black),
               ),
               Expanded(
                 child: _listView(),
               ),
-            ])
-          : Container(
-              child: _playView(),
-              decoration: BoxDecoration(color: Colors.black),
-            ),
+            ]),
     );
   }
 
@@ -215,14 +205,19 @@ class _PlayPageState extends State<PlayPage> {
     _initializeAndPlay(index);
   }
 
-  Widget _playView() {
+  Widget _playView(BuildContext context) {
     // FutureBuilder to display a loading spinner until finishes initializing
-    final controller = _chewieController?.videoPlayerController;
+    final controller = _controller;
     if (controller != null && controller.value.initialized) {
       return AspectRatio(
         //aspectRatio: controller.value.aspectRatio,
         aspectRatio: 16.0 / 9.0,
-        child: Chewie(controller: _chewieController),
+        child: Stack(
+          children: <Widget>[
+            VideoPlayer(controller),
+            _controlView(context),
+          ],
+        ),
       );
     } else {
       return AspectRatio(
@@ -253,7 +248,64 @@ class _PlayPageState extends State<PlayPage> {
     ).build(context);
   }
 
-  // todo: bind clip info
+  Widget _controlView(BuildContext context) {
+    return Stack(
+      children: <Widget>[
+        Center(
+          child: FlatButton(
+            onPressed: () async {
+              if (_isPlaying) {
+                _controller?.pause();
+                _isPlaying = false;
+              } else {
+                final controller = _controller;
+                if (controller != null) {
+                  final position = await controller.position;
+                  final isEnd = controller.value.duration.inSeconds == position.inSeconds;
+                  if (isEnd) {
+                    _initializeAndPlay(_playingIndex);
+                  } else {
+                    controller.play();
+                  }
+                }
+              }
+              setState(() {});
+            },
+            child: Icon(
+              _isPlaying ? Icons.pause : Icons.play_arrow,
+              size: 56.0,
+              color: Colors.white,
+            ),
+          ),
+        ),
+        Column(
+          children: <Widget>[
+            Expanded(child: Container()),
+            Container(
+                child: Row(
+              children: <Widget>[
+                SizedBox(width: 20),
+                Expanded(
+                    child: LinearProgressIndicator(
+                  value: _progress,
+                )),
+                IconButton(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  color: Colors.yellow,
+                  icon: Icon(
+                    Icons.fullscreen,
+                    color: Colors.white,
+                  ),
+                  onPressed: _toggleFullscreen,
+                ),
+              ],
+            )),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildCard(int index) {
     final clip = _clips[index];
     final playing = index == _playingIndex;
