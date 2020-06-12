@@ -101,14 +101,22 @@ class _PlayPageState extends State<PlayPage> {
     Screen.keepOn(false);
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
     _exitFullScreen();
+    _controller?.pause(); // mute instantly
     _controller?.dispose();
     _controller = null;
     super.dispose();
   }
 
   void _clearPrevious() {
-    _controller?.removeListener(_onControllerUpdated);
+    final old = _controller;
     _controller = null;
+    if (old != null) {
+      old.removeListener(_onControllerUpdated);
+      old.pause(); // mute instantly
+      Future.delayed(Duration(milliseconds: 100), (){
+        old.dispose();
+      });
+    }
   }
 
   void _toggleFullscreen() async {
