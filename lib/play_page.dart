@@ -107,18 +107,6 @@ class _PlayPageState extends State<PlayPage> {
     super.dispose();
   }
 
-  void _clearPrevious() {
-    final old = _controller;
-    _controller = null;
-    if (old != null) {
-      old.removeListener(_onControllerUpdated);
-      old.pause(); // mute instantly
-      Future.delayed(Duration(milliseconds: 100), (){
-        old.dispose();
-      });
-    }
-  }
-
   void _toggleFullscreen() async {
     if (_isFullScreen) {
       _exitFullScreen();
@@ -151,7 +139,11 @@ class _PlayPageState extends State<PlayPage> {
     print("_initializeAndPlay ---------> $index");
     final clip = _clips[index];
     final controller = VideoPlayerController.asset(clip.videoPath());
-    _clearPrevious();
+    final old = _controller;
+    if (old != null) {
+      old.removeListener(_onControllerUpdated);
+      await old.pause();
+    }
     _controller = controller;
     setState(() {
       debugPrint("---- controller changed");
@@ -160,6 +152,7 @@ class _PlayPageState extends State<PlayPage> {
     controller
       ..initialize().then((_) {
         debugPrint("---- controller initialized");
+        old?.dispose();
         _playingIndex = index;
         controller.addListener(_onControllerUpdated);
         controller.play();
