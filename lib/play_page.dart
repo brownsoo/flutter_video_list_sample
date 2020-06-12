@@ -256,7 +256,6 @@ class _PlayPageState extends State<PlayPage> {
   }
 
   Widget _playView(BuildContext context) {
-    // FutureBuilder to display a loading spinner until finishes initializing
     final controller = _controller;
     if (controller != null && controller.value.initialized) {
       return AspectRatio(
