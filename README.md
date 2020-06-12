@@ -18,8 +18,8 @@ For testing iOS, you need to change the app identifier.
 
 - [x] Switch video source, Play video list
 - [x] Handle Fullscreen
-- [ ] Progress Controll UI
-- [ ] Volume Controll UI
+- [x] Progress Controll UI
+- [x] Volume Controll UI
 
 
 #### Screenshots
