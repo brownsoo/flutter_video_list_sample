@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:screen/screen.dart';
@@ -39,10 +41,49 @@ class _PlayPageState extends State<PlayPage> {
   var _playingIndex = -1;
   var _disposed = false;
   var _isFullScreen = false;
-  var _isPlaying = false;
   var _isEndOfClip = false;
   var _progress = 0.0;
   var _showingDialog = false;
+  var _isPlaying = false;
+  Timer _timerVisibleControl;
+  double _controlAlpha = 1.0;
+
+  bool get isPlaying {
+    return _isPlaying;
+  }
+
+  set isPlaying(bool value) {
+    _isPlaying = value;
+    _timerVisibleControl?.cancel();
+    if (value) {
+      _timerVisibleControl = Timer(Duration(seconds: 2), () {
+        setState(() {
+          _controlAlpha = 0.0;
+        });
+      });
+    } else {
+      _timerVisibleControl = Timer(Duration(milliseconds: 200), () {
+        setState(() {
+          _controlAlpha = 1.0;
+        });
+      });
+    }
+  }
+
+  void _onTapVideo() {
+    debugPrint("_onTapVideo $_controlAlpha");
+    setState(() {
+      _controlAlpha = _controlAlpha > 0 ? 0 : 1;
+    });
+    _timerVisibleControl?.cancel();
+    _timerVisibleControl = Timer(Duration(seconds: 2), () {
+      if (isPlaying) {
+        setState(() {
+          _controlAlpha = 0.0;
+        });
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -55,9 +96,10 @@ class _PlayPageState extends State<PlayPage> {
   @override
   void dispose() {
     _disposed = true;
+    _timerVisibleControl?.cancel();
     Screen.keepOn(false);
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
-    exitFullScreen();
+    _exitFullScreen();
     _controller?.dispose();
     _controller = null;
     super.dispose();
@@ -70,48 +112,50 @@ class _PlayPageState extends State<PlayPage> {
 
   void _toggleFullscreen() async {
     if (_isFullScreen) {
-      exitFullScreen();
+      _exitFullScreen();
     } else {
-      enterFullScreen();
+      _enterFullScreen();
     }
   }
 
-  void enterFullScreen() async {
+  void _enterFullScreen() async {
     debugPrint("enterFullScreen");
-    _isFullScreen = true;
     await SystemChrome.setEnabledSystemUIOverlays([]);
     await SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+    if (_disposed) return;
+    setState(() {
+      _isFullScreen = true;
+    });
   }
 
-  void exitFullScreen() async {
+  void _exitFullScreen() async {
     debugPrint("exitFullScreen");
-    _isFullScreen = false;
     await SystemChrome.setEnabledSystemUIOverlays(SystemUiOverlay.values);
     await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    if (_disposed) return;
+    setState(() {
+      _isFullScreen = false;
+    });
   }
 
   void _initializeAndPlay(int index) async {
-    print("_initializeAndPlay ---------> $index / _isFullScreen=$_isFullScreen");
+    print("_initializeAndPlay ---------> $index");
     final clip = _clips[index];
     final controller = VideoPlayerController.asset(clip.videoPath());
-
     _clearPrevious();
     _controller = controller;
-
     setState(() {
-      debugPrint("----1");
+      debugPrint("---- controller changed");
     });
 
-    Future.delayed(Duration(milliseconds: 100), () {
-      controller
-        ..initialize().then((_) {
-          debugPrint("----------2");
-          _playingIndex = index;
-          controller.addListener(_onControllerUpdated);
-          controller.play();
-          setState(() {});
-        });
-    });
+    controller
+      ..initialize().then((_) {
+        debugPrint("---- controller initialized");
+        _playingIndex = index;
+        controller.addListener(_onControllerUpdated);
+        controller.play();
+        setState(() {});
+      });
   }
 
   var _playSeconds = 0.0;
@@ -124,12 +168,12 @@ class _PlayPageState extends State<PlayPage> {
     final duration = controller.value.duration;
     if (position == null || duration == null) return;
 
-    final isPlaying = controller.value.isPlaying;
+    final playing = controller.value.isPlaying;
     final isEndOfClip = position.inMilliseconds > 0 && position.inSeconds == duration.inSeconds;
 
     // handle progress
-    final seconds = position.inMilliseconds / 200.0;
-    if (isPlaying && _playSeconds != seconds) {
+    final seconds = position.inMilliseconds / 250.0;
+    if (playing && _playSeconds != seconds) {
       _playSeconds = seconds;
       if (_disposed) return;
       setState(() {
@@ -137,12 +181,12 @@ class _PlayPageState extends State<PlayPage> {
       });
     }
 
-    if (_isPlaying != isPlaying || _isEndOfClip != isEndOfClip) {
-      _isPlaying = isPlaying;
+    if (isPlaying != playing || _isEndOfClip != isEndOfClip) {
+      isPlaying = playing;
       if (_isEndOfClip != isEndOfClip) {
         _isEndOfClip = isEndOfClip;
-        debugPrint("updated -----> isPlaying=$isPlaying / isEndPlaying=$isEndOfClip");
-        if (isEndOfClip && isPlaying) {
+        debugPrint("updated -----> isPlaying=$playing / isEndPlaying=$isEndOfClip");
+        if (isEndOfClip && playing) {
           debugPrint("========================== End of Clip / Handle NEXT ========================== ");
           final isComplete = _playingIndex == _clips.length - 1;
           if (isComplete) {
@@ -150,6 +194,7 @@ class _PlayPageState extends State<PlayPage> {
             if (!_showingDialog) {
               _showingDialog = true;
               _showPlayedAllDialog().then((value) {
+                _exitFullScreen();
                 _showingDialog = false;
               });
             }
@@ -181,17 +226,19 @@ class _PlayPageState extends State<PlayPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Play View"),
-      ),
+      appBar: _isFullScreen
+          ? null
+          : AppBar(
+              title: Text("Play View"),
+            ),
       body: _isFullScreen
           ? Container(
-              child: _playView(context),
+              child: Center(child: _playView(context)),
               decoration: BoxDecoration(color: Colors.black),
             )
           : Column(children: <Widget>[
               Container(
-                child: _playView(context),
+                child: Center(child: _playView(context)),
                 decoration: BoxDecoration(color: Colors.black),
               ),
               Expanded(
@@ -214,8 +261,16 @@ class _PlayPageState extends State<PlayPage> {
         aspectRatio: 16.0 / 9.0,
         child: Stack(
           children: <Widget>[
-            VideoPlayer(controller),
-            _controlView(context),
+            GestureDetector(
+              child: VideoPlayer(controller),
+              onTap: _onTapVideo,
+            ),
+            _controlAlpha > 0 ?
+            AnimatedOpacity(
+              opacity: _controlAlpha,
+              duration: Duration(milliseconds: 250),
+              child: _controlView(context),
+            ) : Container(),
           ],
         ),
       );
@@ -254,9 +309,9 @@ class _PlayPageState extends State<PlayPage> {
         Center(
           child: FlatButton(
             onPressed: () async {
-              if (_isPlaying) {
+              if (isPlaying) {
                 _controller?.pause();
-                _isPlaying = false;
+                isPlaying = false;
               } else {
                 final controller = _controller;
                 if (controller != null) {
@@ -272,7 +327,7 @@ class _PlayPageState extends State<PlayPage> {
               setState(() {});
             },
             child: Icon(
-              _isPlaying ? Icons.pause : Icons.play_arrow,
+              isPlaying ? Icons.pause : Icons.play_arrow,
               size: 56.0,
               color: Colors.white,
             ),
