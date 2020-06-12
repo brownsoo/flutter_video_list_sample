@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -158,7 +159,8 @@ class _PlayPageState extends State<PlayPage> {
       });
   }
 
-  var _playSeconds = 0.0;
+  var _updateProgressInterval = 0.0;
+
   Future<void> _onControllerUpdated() async {
     if (_disposed) return;
     final controller = _controller;
@@ -173,8 +175,9 @@ class _PlayPageState extends State<PlayPage> {
 
     // handle progress
     final seconds = position.inMilliseconds / 250.0;
-    if (playing && _playSeconds != seconds) {
-      _playSeconds = seconds;
+    if (playing && _updateProgressInterval != seconds) {
+      debugPrint("handle progress");
+      _updateProgressInterval = seconds;
       if (_disposed) return;
       setState(() {
         _progress = position.inMilliseconds.ceilToDouble() / duration.inMilliseconds.ceilToDouble();
@@ -265,12 +268,13 @@ class _PlayPageState extends State<PlayPage> {
               child: VideoPlayer(controller),
               onTap: _onTapVideo,
             ),
-            _controlAlpha > 0 ?
-            AnimatedOpacity(
-              opacity: _controlAlpha,
-              duration: Duration(milliseconds: 250),
-              child: _controlView(context),
-            ) : Container(),
+            _controlAlpha > 0
+                ? AnimatedOpacity(
+                    opacity: _controlAlpha,
+                    duration: Duration(milliseconds: 250),
+                    child: _controlView(context),
+                  )
+                : Container(),
           ],
         ),
       );
@@ -304,58 +308,142 @@ class _PlayPageState extends State<PlayPage> {
   }
 
   Widget _controlView(BuildContext context) {
-    return Stack(
+    return Column(
       children: <Widget>[
-        Center(
-          child: FlatButton(
-            onPressed: () async {
-              if (isPlaying) {
-                _controller?.pause();
-                isPlaying = false;
-              } else {
-                final controller = _controller;
-                if (controller != null) {
-                  final position = await controller.position;
-                  final isEnd = controller.value.duration.inSeconds == position.inSeconds;
-                  if (isEnd) {
-                    _initializeAndPlay(_playingIndex);
-                  } else {
-                    controller.play();
-                  }
-                }
-              }
-              setState(() {});
-            },
-            child: Icon(
-              isPlaying ? Icons.pause : Icons.play_arrow,
-              size: 56.0,
-              color: Colors.white,
-            ),
+        _topUI(),
+        Expanded(
+          child: _centerUI(),
+        ),
+        _bottomUI()
+      ],
+    );
+  }
+
+  Widget _centerUI() {
+    return Center(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+      children: <Widget>[
+        FlatButton(
+          onPressed: () async {
+            final index = _playingIndex - 1;
+            if (index > 0 && _clips.length > 0) {
+              _initializeAndPlay(index);
+            }
+          },
+          child: Icon(
+            Icons.fast_rewind,
+            size: 36.0,
+            color: Colors.white,
           ),
         ),
-        Column(
-          children: <Widget>[
-            Expanded(child: Container()),
-            Container(
-                child: Row(
-              children: <Widget>[
-                SizedBox(width: 20),
-                Expanded(
-                    child: LinearProgressIndicator(
-                  value: _progress,
-                )),
-                IconButton(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  color: Colors.yellow,
-                  icon: Icon(
-                    Icons.fullscreen,
-                    color: Colors.white,
-                  ),
-                  onPressed: _toggleFullscreen,
-                ),
-              ],
-            )),
-          ],
+        FlatButton(
+        onPressed: () async {
+          if (isPlaying) {
+            _controller?.pause();
+            isPlaying = false;
+          } else {
+            final controller = _controller;
+            if (controller != null) {
+              final position = await controller.position;
+              final isEnd = controller.value.duration.inSeconds == position.inSeconds;
+              if (isEnd) {
+                _initializeAndPlay(_playingIndex);
+              } else {
+                controller.play();
+              }
+            }
+          }
+          setState(() {});
+        },
+        child: Icon(
+          isPlaying ? Icons.pause : Icons.play_arrow,
+          size: 56.0,
+          color: Colors.white,
+        ),
+      ),
+      FlatButton(
+        onPressed: () async {
+          final index = _playingIndex + 1;
+          if (index < _clips.length - 1) {
+            _initializeAndPlay(index);
+          }
+        },
+        child: Icon(
+          Icons.fast_forward,
+          size: 36.0,
+          color: Colors.white,
+        ),
+      ),
+      ],
+    ));
+  }
+
+  Widget _topUI() {
+    final noMute = (_controller?.value?.volume ?? 0) > 0;
+    return Row(
+      children: <Widget>[
+        IconButton(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          color: Colors.yellow,
+          icon: Icon(
+            noMute ? Icons.volume_up : Icons.volume_off,
+            color: Colors.white,
+          ),
+          onPressed: () {
+            if (noMute) {
+              _controller?.setVolume(0);
+            } else {
+              _controller?.setVolume(1.0);
+            }
+            setState(() {});
+          },
+        ),
+        Expanded(
+          child: Container(),
+        ),
+      ],
+    );
+  }
+
+  Widget _bottomUI() {
+    return Row(
+      children: <Widget>[
+        SizedBox(width: 20),
+        Expanded(
+          child: Slider(
+            value: _progress * 100,
+            min: 0,
+            max: 100,
+            onChanged: (value) {
+              setState(() {
+                _progress = value * 0.01;
+              });
+            },
+            onChangeStart: (value) {
+              debugPrint("-- onChangeStart $value");
+              _controller?.pause();
+            },
+            onChangeEnd: (value) {
+              debugPrint("-- onChangeEnd $value");
+              final duration = _controller?.value?.duration;
+              if (duration != null) {
+                var newValue = max(0, min(value, 99)) * 0.01;
+                var millis = (duration.inMilliseconds * newValue).toInt();
+                _controller?.seekTo(Duration(milliseconds: millis));
+                _controller?.play();
+              }
+            },
+          ),
+        ),
+        IconButton(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          color: Colors.yellow,
+          icon: Icon(
+            Icons.fullscreen,
+            color: Colors.white,
+          ),
+          onPressed: _toggleFullscreen,
         ),
       ],
     );
