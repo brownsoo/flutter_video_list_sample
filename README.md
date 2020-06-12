@@ -1,6 +1,6 @@
-# flutter_video_list_sample
+# flutter video list sample
 
-Flutter example play video list with controller.
+The flutter example playing video list.
 
 ## Getting Started
 
