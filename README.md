@@ -1,16 +1,29 @@
 # flutter_video_list_sample
 
-A new Flutter project.
+Flutter example play video list with controller.
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+This project is a example for a Flutter application.
 
-A few resources to get you started if this is your first Flutter project:
+For testing iOS, you need to change the app identifier.
 
-- [Lab: Write your first Flutter app](https://flutter.dev/docs/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://flutter.dev/docs/cookbook)
+#### pubs used
 
-For help getting started with Flutter, view our
-[online documentation](https://flutter.dev/docs), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+* [path_provider](https://pub.dev/packages/path_provider)
+* [video_player](https://pub.dev/packages/video_player)
+* [screen](https://pub.dev/packages/screen)
+
+#### Todo
+
+- [x] Switch video source, Play video list
+- [x] Handle Fullscreen
+- [ ] Progress Controll UI
+- [ ] Volume Controll UI
+
+
+#### Screenshots
+
+![Play List Screenshot](/Screenshot_1.png)
+
+![Fullscreen Screenshot](/Screenshot_2.png)
