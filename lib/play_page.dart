@@ -45,16 +45,16 @@ class _PlayPageState extends State<PlayPage> {
   var _isEndOfClip = false;
   var _progress = 0.0;
   var _showingDialog = false;
-  var _isPlaying = false;
+  var _playing = false;
   Timer _timerVisibleControl;
   double _controlAlpha = 1.0;
 
-  bool get isPlaying {
-    return _isPlaying;
+  bool get _isPlaying {
+    return _playing;
   }
 
-  set isPlaying(bool value) {
-    _isPlaying = value;
+  set _isPlaying(bool value) {
+    _playing = value;
     _timerVisibleControl?.cancel();
     if (value) {
       _timerVisibleControl = Timer(Duration(seconds: 2), () {
@@ -78,7 +78,7 @@ class _PlayPageState extends State<PlayPage> {
     });
     _timerVisibleControl?.cancel();
     _timerVisibleControl = Timer(Duration(seconds: 2), () {
-      if (isPlaying) {
+      if (_isPlaying) {
         setState(() {
           _controlAlpha = 0.0;
         });
@@ -140,11 +140,11 @@ class _PlayPageState extends State<PlayPage> {
     final clip = _clips[index];
     final controller = VideoPlayerController.asset(clip.videoPath());
     final old = _controller;
+    _controller = controller;
     if (old != null) {
       old.removeListener(_onControllerUpdated);
       await old.pause();
     }
-    _controller = controller;
     setState(() {
       debugPrint("---- controller changed");
     });
@@ -174,40 +174,40 @@ class _PlayPageState extends State<PlayPage> {
     final playing = controller.value.isPlaying;
     final isEndOfClip = position.inMilliseconds > 0 && position.inSeconds == duration.inSeconds;
 
-    // handle progress
-    final seconds = position.inMilliseconds / 250.0;
-    if (playing && _updateProgressInterval != seconds) {
-      debugPrint("handle progress");
-      _updateProgressInterval = seconds;
+    // blocking too many updation
+    final interval = position.inMilliseconds / 250.0;
+    if (playing && _updateProgressInterval != interval) {
+      // handle progress indicator
+      _updateProgressInterval = interval;
       if (_disposed) return;
       setState(() {
         _progress = position.inMilliseconds.ceilToDouble() / duration.inMilliseconds.ceilToDouble();
       });
     }
 
-    if (isPlaying != playing || _isEndOfClip != isEndOfClip) {
-      isPlaying = playing;
-      if (_isEndOfClip != isEndOfClip) {
-        _isEndOfClip = isEndOfClip;
-        debugPrint("updated -----> isPlaying=$playing / isEndPlaying=$isEndOfClip");
-        if (isEndOfClip && playing) {
-          debugPrint("========================== End of Clip / Handle NEXT ========================== ");
-          final isComplete = _playingIndex == _clips.length - 1;
-          if (isComplete) {
-            print("played all!!");
-            if (!_showingDialog) {
-              _showingDialog = true;
-              _showPlayedAllDialog().then((value) {
-                _exitFullScreen();
-                _showingDialog = false;
-              });
-            }
-          } else {
-            _initializeAndPlay(_playingIndex + 1);
+    // handle clip end
+    if (_isPlaying != playing || _isEndOfClip != isEndOfClip) {
+      _isPlaying = playing;
+      _isEndOfClip = isEndOfClip;
+      debugPrint("updated -----> isPlaying=$playing / isEndPlaying=$isEndOfClip");
+      if (isEndOfClip && !playing) {
+        debugPrint("========================== End of Clip / Handle NEXT ========================== ");
+        final isComplete = _playingIndex == _clips.length - 1;
+        if (isComplete) {
+          print("played all!!");
+          if (!_showingDialog) {
+            _showingDialog = true;
+            _showPlayedAllDialog().then((value) {
+              _exitFullScreen();
+              _showingDialog = false;
+            });
           }
+        } else {
+          _initializeAndPlay(_playingIndex + 1);
         }
       }
     }
+
   }
 
   Future<bool> _showPlayedAllDialog() async {
@@ -339,9 +339,9 @@ class _PlayPageState extends State<PlayPage> {
         ),
         FlatButton(
         onPressed: () async {
-          if (isPlaying) {
+          if (_isPlaying) {
             _controller?.pause();
-            isPlaying = false;
+            _isPlaying = false;
           } else {
             final controller = _controller;
             if (controller != null) {
@@ -357,7 +357,7 @@ class _PlayPageState extends State<PlayPage> {
           setState(() {});
         },
         child: Icon(
-          isPlaying ? Icons.pause : Icons.play_arrow,
+          _isPlaying ? Icons.pause : Icons.play_arrow,
           size: 56.0,
           color: Colors.white,
         ),
@@ -412,7 +412,7 @@ class _PlayPageState extends State<PlayPage> {
         SizedBox(width: 20),
         Expanded(
           child: Slider(
-            value: _progress * 100,
+            value: max(0, min(_progress * 100, 100)),
             min: 0,
             max: 100,
             onChanged: (value) {
