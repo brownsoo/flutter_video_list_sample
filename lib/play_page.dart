@@ -45,10 +45,10 @@ class _PlayPageState extends State<PlayPage> {
   var _isEndOfClip = false;
   var _progress = 0.0;
   var _showingDialog = false;
-  var _playing = false;
   Timer _timerVisibleControl;
   double _controlAlpha = 1.0;
 
+  var _playing = false;
   bool get _isPlaying {
     return _playing;
   }
@@ -118,7 +118,8 @@ class _PlayPageState extends State<PlayPage> {
   void _enterFullScreen() async {
     debugPrint("enterFullScreen");
     await SystemChrome.setEnabledSystemUIOverlays([]);
-    await SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+    await SystemChrome.setPreferredOrientations(
+        [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
     if (_disposed) return;
     setState(() {
       _isFullScreen = true;
@@ -172,7 +173,8 @@ class _PlayPageState extends State<PlayPage> {
     if (position == null || duration == null) return;
 
     final playing = controller.value.isPlaying;
-    final isEndOfClip = position.inMilliseconds > 0 && position.inSeconds == duration.inSeconds;
+    final isEndOfClip =
+        position.inMilliseconds > 0 && position.inSeconds == duration.inSeconds;
 
     // blocking too many updation
     final interval = position.inMilliseconds / 250.0;
@@ -181,7 +183,8 @@ class _PlayPageState extends State<PlayPage> {
       _updateProgressInterval = interval;
       if (_disposed) return;
       setState(() {
-        _progress = position.inMilliseconds.ceilToDouble() / duration.inMilliseconds.ceilToDouble();
+        _progress = position.inMilliseconds.ceilToDouble() /
+            duration.inMilliseconds.ceilToDouble();
       });
     }
 
@@ -189,9 +192,11 @@ class _PlayPageState extends State<PlayPage> {
     if (_isPlaying != playing || _isEndOfClip != isEndOfClip) {
       _isPlaying = playing;
       _isEndOfClip = isEndOfClip;
-      debugPrint("updated -----> isPlaying=$playing / isEndPlaying=$isEndOfClip");
+      debugPrint(
+          "updated -----> isPlaying=$playing / isEndPlaying=$isEndOfClip");
       if (isEndOfClip && !playing) {
-        debugPrint("========================== End of Clip / Handle NEXT ========================== ");
+        debugPrint(
+            "========================== End of Clip / Handle NEXT ========================== ");
         final isComplete = _playingIndex == _clips.length - 1;
         if (isComplete) {
           print("played all!!");
@@ -207,7 +212,6 @@ class _PlayPageState extends State<PlayPage> {
         }
       }
     }
-
   }
 
   Future<bool> _showPlayedAllDialog() async {
@@ -284,7 +288,10 @@ class _PlayPageState extends State<PlayPage> {
         child: Center(
             child: Text(
           "준비중 ...",
-          style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 18.0),
+          style: TextStyle(
+              color: Colors.white70,
+              fontWeight: FontWeight.bold,
+              fontSize: 18.0),
         )),
       );
     }
@@ -322,7 +329,7 @@ class _PlayPageState extends State<PlayPage> {
   Widget _centerUI() {
     return Center(
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: <Widget>[
         FlatButton(
           onPressed: () async {
@@ -338,59 +345,78 @@ class _PlayPageState extends State<PlayPage> {
           ),
         ),
         FlatButton(
-        onPressed: () async {
-          if (_isPlaying) {
-            _controller?.pause();
-            _isPlaying = false;
-          } else {
-            final controller = _controller;
-            if (controller != null) {
-              final position = await controller.position;
-              final isEnd = controller.value.duration.inSeconds == position.inSeconds;
-              if (isEnd) {
-                _initializeAndPlay(_playingIndex);
-              } else {
-                controller.play();
+          onPressed: () async {
+            if (_isPlaying) {
+              _controller?.pause();
+              _isPlaying = false;
+            } else {
+              final controller = _controller;
+              if (controller != null) {
+                final position = await controller.position;
+                final isEnd =
+                    controller.value.duration.inSeconds == position.inSeconds;
+                if (isEnd) {
+                  _initializeAndPlay(_playingIndex);
+                } else {
+                  controller.play();
+                }
               }
             }
-          }
-          setState(() {});
-        },
-        child: Icon(
-          _isPlaying ? Icons.pause : Icons.play_arrow,
-          size: 56.0,
-          color: Colors.white,
+            setState(() {});
+          },
+          child: Icon(
+            _isPlaying ? Icons.pause : Icons.play_arrow,
+            size: 56.0,
+            color: Colors.white,
+          ),
         ),
-      ),
-      FlatButton(
-        onPressed: () async {
-          final index = _playingIndex + 1;
-          if (index < _clips.length - 1) {
-            _initializeAndPlay(index);
-          }
-        },
-        child: Icon(
-          Icons.fast_forward,
-          size: 36.0,
-          color: Colors.white,
+        FlatButton(
+          onPressed: () async {
+            final index = _playingIndex + 1;
+            if (index < _clips.length - 1) {
+              _initializeAndPlay(index);
+            }
+          },
+          child: Icon(
+            Icons.fast_forward,
+            size: 36.0,
+            color: Colors.white,
+          ),
         ),
-      ),
       ],
     ));
   }
 
+  String convertTwo(int value) {
+    return value < 10 ? "0$value" : "$value";
+  }
+
   Widget _topUI() {
     final noMute = (_controller?.value?.volume ?? 0) > 0;
+    final duration =
+        _controller == null ? 0 : _controller.value.duration.inSeconds;
+    final head = _controller == null ? 0 : _controller.value.position.inSeconds;
+    final remained = max(0, duration - head);
+    final min = convertTwo(remained ~/ 60.0);
+    final sec = convertTwo(remained % 60);
     return Row(
       children: <Widget>[
-        IconButton(
-          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          color: Colors.yellow,
-          icon: Icon(
-            noMute ? Icons.volume_up : Icons.volume_off,
-            color: Colors.white,
+        InkWell(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Container(
+                decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [
+                  BoxShadow(
+                      offset: const Offset(0.0, 0.0),
+                      blurRadius: 4.0,
+                      color: Color.fromARGB(50, 0, 0, 0)),
+                ]),
+                child: Icon(
+                  noMute ? Icons.volume_up : Icons.volume_off,
+                  color: Colors.white,
+                )),
           ),
-          onPressed: () {
+          onTap: () {
             if (noMute) {
               _controller?.setVolume(0);
             } else {
@@ -402,6 +428,20 @@ class _PlayPageState extends State<PlayPage> {
         Expanded(
           child: Container(),
         ),
+        Text(
+          "$min:$sec",
+          style: TextStyle(
+            color: Colors.white,
+            shadows: <Shadow>[
+              Shadow(
+                offset: Offset(0.0, 1.0),
+                blurRadius: 4.0,
+                color: Color.fromARGB(150, 0, 0, 0),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(width: 10)
       ],
     );
   }
@@ -480,9 +520,12 @@ class _PlayPageState extends State<PlayPage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(clip.title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(clip.title,
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
                     Padding(
-                      child: Text("$runtime", style: TextStyle(color: Colors.grey[500])),
+                      child: Text("$runtime",
+                          style: TextStyle(color: Colors.grey[500])),
                       padding: EdgeInsets.only(top: 3),
                     )
                   ]),
