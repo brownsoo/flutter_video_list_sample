@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_video_list_sample/basic_page.dart';
 import 'package:flutter_video_list_sample/clips.dart';
 import 'package:flutter_video_list_sample/play_page.dart';
 
@@ -92,6 +93,27 @@ class _IntroPageState extends State<IntroPage> {
                       padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                       child: Text(
                         "Play remote files",
+                        style: TextStyle(
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                    MaterialButton(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(32)),
+                          side: BorderSide(color: Colors.black45, width: 1)),
+                      color: Colors.white,
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          CupertinoPageRoute(builder: (context) => BasicPage()),
+                        );
+                      },
+                      minWidth: 240,
+                      padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      child: Text(
+                        "Basic Example",
                         style: TextStyle(
                           fontSize: 16,
                         ),

@@ -145,6 +145,8 @@ class _PlayPageState extends State<PlayPage> {
         debugPrint("---- controller initialized");
         old?.dispose();
         _playingIndex = index;
+        _duration = null;
+        _position = null;
         controller.addListener(_onControllerUpdated);
         controller.play();
         setState(() {});
@@ -152,24 +154,34 @@ class _PlayPageState extends State<PlayPage> {
   }
 
   var _updateProgressInterval = 0.0;
+  Duration _duration;
+  Duration _position;
 
-  Future<void> _onControllerUpdated() async {
+  void _onControllerUpdated() async {
     if (_disposed) return;
+    // blocking too many updation
+    // important !!
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (_updateProgressInterval > now) {
+      return;
+    }
+    _updateProgressInterval = now + 500.0;
+
     final controller = _controller;
     if (controller == null) return;
     if (!controller.value.initialized) return;
-    final position = await controller.position;
-    final duration = controller.value.duration;
-    if (position == null || duration == null) return;
+    if (_duration == null) {
+      _duration = _controller.value.duration;
+    }
+    var duration = _duration;
+    if (duration == null) return;
 
+    var position = await controller.position;
+    _position = position;
     final playing = controller.value.isPlaying;
     final isEndOfClip = position.inMilliseconds > 0 && position.inSeconds == duration.inSeconds;
-
-    // blocking too many updation
-    final interval = position.inMilliseconds / 250.0;
-    if (playing && _updateProgressInterval != interval) {
+    if (playing) {
       // handle progress indicator
-      _updateProgressInterval = interval;
       if (_disposed) return;
       setState(() {
         _progress = position.inMilliseconds.ceilToDouble() / duration.inMilliseconds.ceilToDouble();
@@ -375,8 +387,8 @@ class _PlayPageState extends State<PlayPage> {
 
   Widget _topUI() {
     final noMute = (_controller?.value?.volume ?? 0) > 0;
-    final duration = _controller == null ? 0 : _controller.value.duration.inSeconds;
-    final head = _controller == null ? 0 : _controller.value.position.inSeconds;
+    final duration = _duration?.inSeconds ?? 0;
+    final head = _position?.inSeconds ?? 0;
     final remained = max(0, duration - head);
     final min = convertTwo(remained ~/ 60.0);
     final sec = convertTwo(remained % 60);
