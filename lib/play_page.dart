@@ -3,41 +3,25 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_video_list_sample/clips.dart';
 import 'package:screen/screen.dart';
 import 'package:video_player/video_player.dart';
 
 class PlayPage extends StatefulWidget {
-  PlayPage({Key key}) : super(key: key);
+  PlayPage({Key key, @required this.clips}) : super(key: key);
+
+  final List<VideoClip> clips;
 
   @override
   _PlayPageState createState() => _PlayPageState();
 }
 
-class Clip {
-  final String fileName;
-  final String title;
-  final int runningTime;
-  Clip(this.fileName, this.title, this.runningTime);
-
-  String videoPath() {
-    return "embed/$fileName.mp4";
-  }
-
-  String thumbPath() {
-    return "embed/$fileName.png";
-  }
-}
-
 class _PlayPageState extends State<PlayPage> {
   VideoPlayerController _controller;
 
-  List<Clip> _clips = [
-    new Clip("small", "small", 6),
-    new Clip("earth", "earth", 13),
-    new Clip("giraffe", "giraffe", 18),
-    new Clip("particle", "particle", 11),
-    new Clip("summer", "summer", 8)
-  ];
+  List<VideoClip> get _clips {
+    return widget.clips;
+  }
 
   var _playingIndex = -1;
   var _disposed = false;
@@ -58,12 +42,14 @@ class _PlayPageState extends State<PlayPage> {
     _timerVisibleControl?.cancel();
     if (value) {
       _timerVisibleControl = Timer(Duration(seconds: 2), () {
+        if (_disposed) return;
         setState(() {
           _controlAlpha = 0.0;
         });
       });
     } else {
       _timerVisibleControl = Timer(Duration(milliseconds: 200), () {
+        if (_disposed) return;
         setState(() {
           _controlAlpha = 1.0;
         });
@@ -118,8 +104,7 @@ class _PlayPageState extends State<PlayPage> {
   void _enterFullScreen() async {
     debugPrint("enterFullScreen");
     await SystemChrome.setEnabledSystemUIOverlays([]);
-    await SystemChrome.setPreferredOrientations(
-        [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+    await SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
     if (_disposed) return;
     setState(() {
       _isFullScreen = true;
@@ -139,16 +124,21 @@ class _PlayPageState extends State<PlayPage> {
   void _initializeAndPlay(int index) async {
     print("_initializeAndPlay ---------> $index");
     final clip = _clips[index];
-    final controller = VideoPlayerController.asset(clip.videoPath());
+
+    final controller = clip.parent.startsWith("http")
+        ? VideoPlayerController.network(clip.videoPath())
+        : VideoPlayerController.asset(clip.videoPath());
+
     final old = _controller;
     _controller = controller;
     if (old != null) {
       old.removeListener(_onControllerUpdated);
-      await old.pause();
+      old.pause();
+      debugPrint("---- old contoller paused.");
     }
-    setState(() {
-      debugPrint("---- controller changed");
-    });
+
+    debugPrint("---- controller changed.");
+    setState(() {});
 
     controller
       ..initialize().then((_) {
@@ -173,8 +163,7 @@ class _PlayPageState extends State<PlayPage> {
     if (position == null || duration == null) return;
 
     final playing = controller.value.isPlaying;
-    final isEndOfClip =
-        position.inMilliseconds > 0 && position.inSeconds == duration.inSeconds;
+    final isEndOfClip = position.inMilliseconds > 0 && position.inSeconds == duration.inSeconds;
 
     // blocking too many updation
     final interval = position.inMilliseconds / 250.0;
@@ -183,8 +172,7 @@ class _PlayPageState extends State<PlayPage> {
       _updateProgressInterval = interval;
       if (_disposed) return;
       setState(() {
-        _progress = position.inMilliseconds.ceilToDouble() /
-            duration.inMilliseconds.ceilToDouble();
+        _progress = position.inMilliseconds.ceilToDouble() / duration.inMilliseconds.ceilToDouble();
       });
     }
 
@@ -192,11 +180,9 @@ class _PlayPageState extends State<PlayPage> {
     if (_isPlaying != playing || _isEndOfClip != isEndOfClip) {
       _isPlaying = playing;
       _isEndOfClip = isEndOfClip;
-      debugPrint(
-          "updated -----> isPlaying=$playing / isEndPlaying=$isEndOfClip");
+      debugPrint("updated -----> isPlaying=$playing / isEndPlaying=$isEndOfClip");
       if (isEndOfClip && !playing) {
-        debugPrint(
-            "========================== End of Clip / Handle NEXT ========================== ");
+        debugPrint("========================== End of Clip / Handle NEXT ========================== ");
         final isComplete = _playingIndex == _clips.length - 1;
         if (isComplete) {
           print("played all!!");
@@ -220,10 +206,10 @@ class _PlayPageState extends State<PlayPage> {
         barrierDismissible: true,
         builder: (BuildContext context) {
           return AlertDialog(
-            content: SingleChildScrollView(child: Text("끝까지 재생되었습니다.")),
+            content: SingleChildScrollView(child: Text("Played all videos.")),
             actions: <Widget>[
               FlatButton(
-                child: Text("닫기"),
+                child: Text("Close"),
                 onPressed: () => Navigator.pop(context, true),
               )
             ],
@@ -287,11 +273,8 @@ class _PlayPageState extends State<PlayPage> {
         aspectRatio: 16.0 / 9.0,
         child: Center(
             child: Text(
-          "준비중 ...",
-          style: TextStyle(
-              color: Colors.white70,
-              fontWeight: FontWeight.bold,
-              fontSize: 18.0),
+          "Preparing ...",
+          style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 18.0),
         )),
       );
     }
@@ -353,8 +336,7 @@ class _PlayPageState extends State<PlayPage> {
               final controller = _controller;
               if (controller != null) {
                 final position = await controller.position;
-                final isEnd =
-                    controller.value.duration.inSeconds == position.inSeconds;
+                final isEnd = controller.value.duration.inSeconds == position.inSeconds;
                 if (isEnd) {
                   _initializeAndPlay(_playingIndex);
                 } else {
@@ -393,8 +375,7 @@ class _PlayPageState extends State<PlayPage> {
 
   Widget _topUI() {
     final noMute = (_controller?.value?.volume ?? 0) > 0;
-    final duration =
-        _controller == null ? 0 : _controller.value.duration.inSeconds;
+    final duration = _controller == null ? 0 : _controller.value.duration.inSeconds;
     final head = _controller == null ? 0 : _controller.value.position.inSeconds;
     final remained = max(0, duration - head);
     final min = convertTwo(remained ~/ 60.0);
@@ -406,10 +387,7 @@ class _PlayPageState extends State<PlayPage> {
             padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Container(
                 decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [
-                  BoxShadow(
-                      offset: const Offset(0.0, 0.0),
-                      blurRadius: 4.0,
-                      color: Color.fromARGB(50, 0, 0, 0)),
+                  BoxShadow(offset: const Offset(0.0, 0.0), blurRadius: 4.0, color: Color.fromARGB(50, 0, 0, 0)),
                 ]),
                 child: Icon(
                   noMute ? Icons.volume_up : Icons.volume_off,
@@ -507,12 +485,9 @@ class _PlayPageState extends State<PlayPage> {
           children: <Widget>[
             Padding(
               padding: EdgeInsets.only(right: 8),
-              child: Image.asset(
-                clip.thumbPath(),
-                width: 70,
-                height: 50,
-                fit: BoxFit.fill,
-              ),
+              child: clip.parent.startsWith("http")
+                  ? Image.network(clip.thumbPath(), width: 70, height: 50, fit: BoxFit.fill)
+                  : Image.asset(clip.thumbPath(), width: 70, height: 50, fit: BoxFit.fill),
             ),
             Expanded(
               child: Column(
@@ -520,12 +495,9 @@ class _PlayPageState extends State<PlayPage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(clip.title,
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(clip.title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     Padding(
-                      child: Text("$runtime",
-                          style: TextStyle(color: Colors.grey[500])),
+                      child: Text("$runtime", style: TextStyle(color: Colors.grey[500])),
                       padding: EdgeInsets.only(top: 3),
                     )
                   ]),
