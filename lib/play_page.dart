@@ -4,8 +4,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_video_list_sample/clips.dart';
-import 'package:screen/screen.dart';
 import 'package:video_player/video_player.dart';
+import 'package:wakelock/wakelock.dart';
 
 class PlayPage extends StatefulWidget {
   PlayPage({Key key, @required this.clips}) : super(key: key);
@@ -74,7 +74,7 @@ class _PlayPageState extends State<PlayPage> {
 
   @override
   void initState() {
-    Screen.keepOn(true);
+    Wakelock.enable();
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
     _initializeAndPlay(0);
     super.initState();
@@ -84,7 +84,7 @@ class _PlayPageState extends State<PlayPage> {
   void dispose() {
     _disposed = true;
     _timerVisibleControl?.cancel();
-    Screen.keepOn(false);
+    Wakelock.disable();
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
     _exitFullScreen();
     _controller?.pause(); // mute instantly
@@ -169,7 +169,7 @@ class _PlayPageState extends State<PlayPage> {
 
     final controller = _controller;
     if (controller == null) return;
-    if (!controller.value.initialized) return;
+    if (!controller.value.isInitialized) return;
     if (_duration == null) {
       _duration = _controller.value.duration;
     }
@@ -260,7 +260,7 @@ class _PlayPageState extends State<PlayPage> {
 
   Widget _playView(BuildContext context) {
     final controller = _controller;
-    if (controller != null && controller.value.initialized) {
+    if (controller != null && controller.value.isInitialized) {
       return AspectRatio(
         //aspectRatio: controller.value.aspectRatio,
         aspectRatio: 16.0 / 9.0,
