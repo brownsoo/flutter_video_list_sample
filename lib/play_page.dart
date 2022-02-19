@@ -103,7 +103,7 @@ class _PlayPageState extends State<PlayPage> {
 
   void _enterFullScreen() async {
     debugPrint("enterFullScreen");
-    await SystemChrome.setEnabledSystemUIOverlays([]);
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
     await SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
     if (_disposed) return;
     setState(() {
@@ -113,7 +113,7 @@ class _PlayPageState extends State<PlayPage> {
 
   void _exitFullScreen() async {
     debugPrint("exitFullScreen");
-    await SystemChrome.setEnabledSystemUIOverlays(SystemUiOverlay.values);
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     if (_disposed) return;
     setState(() {
@@ -220,10 +220,10 @@ class _PlayPageState extends State<PlayPage> {
           return AlertDialog(
             content: SingleChildScrollView(child: Text("Played all videos.")),
             actions: <Widget>[
-              FlatButton(
-                child: Text("Close"),
+              TextButton(
                 onPressed: () => Navigator.pop(context, true),
-              )
+                child: Text("Close"),
+              ),
             ],
           );
         });
@@ -326,7 +326,7 @@ class _PlayPageState extends State<PlayPage> {
         child: Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: <Widget>[
-        FlatButton(
+        TextButton(
           onPressed: () async {
             final index = _playingIndex - 1;
             if (index > 0 && _clips.length > 0) {
@@ -339,7 +339,7 @@ class _PlayPageState extends State<PlayPage> {
             color: Colors.white,
           ),
         ),
-        FlatButton(
+        TextButton(
           onPressed: () async {
             if (_isPlaying) {
               _controller?.pause();
@@ -365,7 +365,7 @@ class _PlayPageState extends State<PlayPage> {
             color: Colors.white,
           ),
         ),
-        FlatButton(
+        TextButton(
           onPressed: () async {
             final index = _playingIndex + 1;
             if (index < _clips.length - 1) {
