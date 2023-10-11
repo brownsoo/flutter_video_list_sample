@@ -12,7 +12,7 @@ For testing iOS, you need to change the app identifier.
 
 * [path_provider](https://pub.dev/packages/path_provider)
 * [video_player](https://pub.dev/packages/video_player)
-* [wakelock](https://pub.dev/packages/wakelock)
+* [wakelock_plus](https://pub.dev/packages/wakelock_plus)
 
 #### Todo
 
