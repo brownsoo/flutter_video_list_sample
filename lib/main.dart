@@ -24,8 +24,6 @@ class MyApp extends StatelessWidget {
 }
 
 class IntroPage extends StatefulWidget {
-  IntroPage({Key key}) : super(key: key);
-
   @override
   _IntroPageState createState() => _IntroPageState();
 }

@@ -5,10 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_video_list_sample/clips.dart';
 import 'package:video_player/video_player.dart';
-import 'package:wakelock/wakelock.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 class PlayPage extends StatefulWidget {
-  PlayPage({Key key, @required this.clips}) : super(key: key);
+  PlayPage({required this.clips});
 
   final List<VideoClip> clips;
 
@@ -17,7 +17,7 @@ class PlayPage extends StatefulWidget {
 }
 
 class _PlayPageState extends State<PlayPage> {
-  VideoPlayerController _controller;
+  VideoPlayerController? _controller;
 
   List<VideoClip> get _clips {
     return widget.clips;
@@ -29,16 +29,19 @@ class _PlayPageState extends State<PlayPage> {
   var _isEndOfClip = false;
   var _progress = 0.0;
   var _showingDialog = false;
-  Timer _timerVisibleControl;
+  var _updateProgressInterval = 0.0;
+  var _isPlayingValue = false;
+  Timer? _timerVisibleControl;
   double _controlAlpha = 1.0;
+  Duration? _duration;
+  Duration? _position;
 
-  var _playing = false;
   bool get _isPlaying {
-    return _playing;
+    return _isPlayingValue;
   }
 
   set _isPlaying(bool value) {
-    _playing = value;
+    _isPlayingValue = value;
     _timerVisibleControl?.cancel();
     if (value) {
       _timerVisibleControl = Timer(Duration(seconds: 2), () {
@@ -74,7 +77,7 @@ class _PlayPageState extends State<PlayPage> {
 
   @override
   void initState() {
-    Wakelock.enable();
+    WakelockPlus.enable();
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
     _initializeAndPlay(0);
     super.initState();
@@ -84,7 +87,7 @@ class _PlayPageState extends State<PlayPage> {
   void dispose() {
     _disposed = true;
     _timerVisibleControl?.cancel();
-    Wakelock.disable();
+    WakelockPlus.disable();
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
     _exitFullScreen();
     _controller?.pause(); // mute instantly
@@ -124,9 +127,8 @@ class _PlayPageState extends State<PlayPage> {
   void _initializeAndPlay(int index) async {
     print("_initializeAndPlay ---------> $index");
     final clip = _clips[index];
-
     final controller = clip.parent.startsWith("http")
-        ? VideoPlayerController.network(clip.videoPath())
+        ? VideoPlayerController.networkUrl(Uri.parse(clip.videoPath()))
         : VideoPlayerController.asset(clip.videoPath());
 
     final old = _controller;
@@ -153,10 +155,6 @@ class _PlayPageState extends State<PlayPage> {
       });
   }
 
-  var _updateProgressInterval = 0.0;
-  Duration _duration;
-  Duration _position;
-
   void _onControllerUpdated() async {
     if (_disposed) return;
     // blocking too many updation
@@ -171,13 +169,14 @@ class _PlayPageState extends State<PlayPage> {
     if (controller == null) return;
     if (!controller.value.isInitialized) return;
     if (_duration == null) {
-      _duration = _controller.value.duration;
+      _duration = controller.value.duration;
     }
     var duration = _duration;
     if (duration == null) return;
 
     var position = await controller.position;
     _position = position;
+    if (position == null) return;
     final playing = controller.value.isPlaying;
     final isEndOfClip = position.inMilliseconds > 0 && position.inSeconds + 1 >= duration.inSeconds;
     if (playing) {
@@ -212,8 +211,8 @@ class _PlayPageState extends State<PlayPage> {
     }
   }
 
-  Future<bool> _showPlayedAllDialog() async {
-    return showDialog<bool>(
+  Future<bool?> _showPlayedAllDialog() async {
+    return showDialog<bool?>(
         context: context,
         barrierDismissible: true,
         builder: (BuildContext context) {
@@ -387,7 +386,7 @@ class _PlayPageState extends State<PlayPage> {
   }
 
   Widget _topUI() {
-    final noMute = (_controller?.value?.volume ?? 0) > 0;
+    final noMute = (_controller?.value.volume ?? 0) > 0;
     final duration = _duration?.inSeconds ?? 0;
     final head = _position?.inSeconds ?? 0;
     final remained = max(0, duration - head);
@@ -457,7 +456,7 @@ class _PlayPageState extends State<PlayPage> {
             },
             onChangeEnd: (value) {
               debugPrint("-- onChangeEnd $value");
-              final duration = _controller?.value?.duration;
+              final duration = _controller?.value.duration;
               if (duration != null) {
                 var newValue = max(0, min(value, 99)) * 0.01;
                 var millis = (duration.inMilliseconds * newValue).toInt();

@@ -7,13 +7,13 @@ class BasicPage extends StatefulWidget {
 }
 
 class _VideoAppState extends State<BasicPage> {
-  VideoPlayerController _controller;
+  VideoPlayerController? _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.network(
-        'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4')
+    final uri = Uri.parse('http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4');
+    _controller = VideoPlayerController.networkUrl(uri)
       ..initialize().then((_) {
         // Ensure the first frame is shown after the video is initialized, even before the play button has been pressed.
         setState(() {});
@@ -21,35 +21,39 @@ class _VideoAppState extends State<BasicPage> {
   }
 
   @override
+  void dispose() {
+    super.dispose();
+    _controller?.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final controller = _controller;
     return Scaffold(
       appBar: AppBar(
         title: Text("Basic Play View"),
       ),
       body: Center(
-        child: _controller.value.isInitialized
+        child: controller != null && controller.value.isInitialized
             ? AspectRatio(
-                aspectRatio: _controller.value.aspectRatio,
-                child: VideoPlayer(_controller),
+                aspectRatio: controller.value.aspectRatio,
+                child: VideoPlayer(controller),
               )
             : Container(),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           setState(() {
-            _controller.value.isPlaying ? _controller.pause() : _controller.play();
+            final controller = _controller;
+            if (controller != null) {
+              controller.value.isPlaying ? controller.pause() : controller.play();
+            }
           });
         },
         child: Icon(
-          _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+          (controller != null && controller.value.isPlaying) ? Icons.pause : Icons.play_arrow,
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-    _controller.dispose();
   }
 }
