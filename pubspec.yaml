@@ -25,12 +25,15 @@ dependencies:
   flutter:
     sdk: flutter
 
-
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
-  path_provider: ^2.1.1
-  video_player: ^2.7.2
-  wakelock_plus: ^1.1.1
+  # https://pub.dev/packages/path_provider
+  # for finding commonly used locations on the filesystem.
+  path_provider: ^2.1.3
+  # https://pub.dev/packages/video_player
+  # for playing video files.
+  video_player: ^2.8.6
+  # https://pub.dev/packages/wakelock_plus
+  # for keeping the screen on while playing video.
+  wakelock_plus: ^1.2.5
 
 dev_dependencies:
   flutter_test:
