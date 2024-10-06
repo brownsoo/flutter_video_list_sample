@@ -178,7 +178,8 @@ class _PlayPageState extends State<PlayPage> {
     _position = position;
     if (position == null) return;
     final playing = controller.value.isPlaying;
-    final isEndOfClip = position.inMilliseconds > 0 && position.inSeconds + 1 >= duration.inSeconds;
+    final isEndOfClip =
+        controller.value.isCompleted || position.inMilliseconds > 0 && position.inSeconds + 1 >= duration.inSeconds;
     if (playing) {
       // handle progress indicator
       if (_disposed) return;
@@ -192,7 +193,7 @@ class _PlayPageState extends State<PlayPage> {
       _isPlaying = playing;
       _isEndOfClip = isEndOfClip;
       debugPrint("updated -----> isPlaying=$playing / isEndOfClip=$isEndOfClip");
-      if (isEndOfClip && !playing) {
+      if (isEndOfClip) {
         debugPrint("========================== End of Clip / Handle NEXT ========================== ");
         final isComplete = _playingIndex == _clips.length - 1;
         if (isComplete) {
