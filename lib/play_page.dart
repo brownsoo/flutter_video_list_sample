@@ -157,14 +157,6 @@ class _PlayPageState extends State<PlayPage> {
 
   void _onControllerUpdated() async {
     if (_disposed) return;
-    // blocking too many updation
-    // important !!
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (_updateProgressInterval > now) {
-      return;
-    }
-    _updateProgressInterval = now + 500.0;
-
     final controller = _controller;
     if (controller == null) return;
     if (!controller.value.isInitialized) return;
@@ -177,9 +169,20 @@ class _PlayPageState extends State<PlayPage> {
     var position = await controller.position;
     _position = position;
     if (position == null) return;
+
+    // blocking too many updation
+    // important !!
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (_updateProgressInterval > now) {
+      // check if end of clip in update interval
+      if (!controller.value.isCompleted) {
+        return;
+      }
+      debugPrint("종료구만..");
+    }
+    _updateProgressInterval = now + 500.0;
+
     final playing = controller.value.isPlaying;
-    final isEndOfClip =
-        controller.value.isCompleted || position.inMilliseconds > 0 && position.inSeconds + 1 >= duration.inSeconds;
     if (playing) {
       // handle progress indicator
       if (_disposed) return;
@@ -187,6 +190,7 @@ class _PlayPageState extends State<PlayPage> {
         _progress = position.inMilliseconds.ceilToDouble() / duration.inMilliseconds.ceilToDouble();
       });
     }
+    final isEndOfClip = controller.value.isCompleted;
 
     // handle clip end
     if (_isPlaying != playing || _isEndOfClip != isEndOfClip) {
